@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   Activity, Bot, BriefcaseBusiness, ChartNoAxesCombined, ChevronLeft, ChevronRight,
   FileText, Headphones, LayoutDashboard, Layers3, Mail, MessageCircle, Plug,
-  Send, ShieldCheck, Smartphone, Users, PhoneCall, X,
+  Send, ShieldCheck, Smartphone, Users, PhoneCall, X,Youtube,Linkedin,Facebook,Instagram
 } from "lucide-react";
 import { navigationGroups } from "@/data/navigation";
 
@@ -30,6 +30,11 @@ const iconMap = {
   bot: Bot,
   file: FileText,
   plug: Plug,
+    instagram: Instagram,
+  facebook: Facebook,
+  linkedin: Linkedin,
+  youtube: Youtube,
+  
 };
 
 function normalizedSection(section: string) {
@@ -54,7 +59,7 @@ export function Sidebar({ section, collapsed, mobileOpen, onToggleCollapse, onCl
             <div className="nav-group" key={group.label}>
               <div className="nav-label">{group.label}</div>
               {group.items.map((item) => {
-                const Icon = iconMap[item.icon as keyof typeof iconMap];
+               const Icon = iconMap[item.icon as keyof typeof iconMap] ?? Activity;
                 const isActive = activeHref === item.href || (item.href === "/help" && (section === "support" || section === "help"));
                 return (
                   <Link

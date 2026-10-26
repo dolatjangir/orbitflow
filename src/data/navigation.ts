@@ -27,5 +27,14 @@ export const navigationGroups = [
       { label: "Integrations", href: "/integrations", icon: "plug", badge: "" },
     ],
   },
+    {
+    label: "Social Media",
+    items: [
+      { label: "Instagram", href: "/instagram", icon: "instagram", badge: "NEW" },
+      { label: "Facebook", href: "/facebook", icon: "facebook", badge: "" },
+      { label: "LinkedIn", href: "/linkedin", icon: "linkedin", badge: "" },
+       { label: "YouTube", href: "/youtube", icon: "youtube", badge: "" },
+    ],
+  },
 ];
 

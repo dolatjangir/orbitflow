@@ -34,7 +34,7 @@ import { routeMeta } from "@/data/route-meta";
 import type { Contact } from "@/types/contact";
 import type { Deal } from "@/types/deal";
 
-type ModalName = "campaign" | "credits" | "tutorials" | "assistant" | "step" | "contact" | "deal" | "agent" | null;
+type ModalName = "campaign" | "credits" | "tutorials" | "assistant" | "step" | "contact" | "deal" | "agent" | "connect-whatsapp" | null;
 type Props = { initialSection: string };
 
 function getSection(raw: string) {
@@ -167,7 +167,18 @@ export function DashboardApp({ initialSection }: Props) {
   const openCredits = () => setModal("credits");
   const openAssistant = () => setModal("assistant");
   const openTutorials = () => setModal("tutorials");
-  const connectChannel = (name: string) => notify(`${name} connection`, "Connection settings opened in demo mode. Add provider credentials and secure server-side API routes to connect a live account.");
+const connectChannel = (name: string) => {
+  if (name === "WhatsApp") {
+    setModal("connect-whatsapp");
+    return;
+  }
+
+  notify(
+    `${name} connection`,
+    "Connection settings opened in demo mode. Add provider credentials and secure server-side API routes to connect a live account."
+  );
+};
+
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -243,7 +254,67 @@ export function DashboardApp({ initialSection }: Props) {
       <Modal open={Boolean(selectedDeal)} title={selectedDeal?.name ?? "Deal details"} subtitle="Opportunity profile · demo data" onClose={() => setSelectedDeal(null)} footer={<><button className="button button-secondary" onClick={() => setSelectedDeal(null)}>Close</button><button className="button button-primary" onClick={() => { const deal = selectedDeal; setSelectedDeal(null); if (deal) notify("Deal follow-up", `Next step for ${deal.name}: confirm buyer needs and agree on the next meeting.`); }}>Plan next step <ArrowRight size={13} /></button></>}>
         {selectedDeal ? <div className="form-stack"><div className="section-panel panel-padding"><div className="stat-label">Opportunity value</div><div className="stat-value" style={{ marginTop: 8 }}>{formatCurrency(selectedDeal.value)}</div><div style={{ marginTop: 10 }}><span className={`status-pill ${selectedDeal.stage === "Won" ? "success" : selectedDeal.stage === "Negotiation" || selectedDeal.stage === "Proposal" ? "warning" : ""}`}>{selectedDeal.stage}</span></div></div><div className="form-grid"><div><div className="field-label">Company</div><div style={{ color: "var(--text-soft)", fontSize: 12 }}>{selectedDeal.company}</div></div><div><div className="field-label">Deal owner</div><div style={{ color: "var(--text-soft)", fontSize: 12 }}>{selectedDeal.owner}</div></div><div><div className="field-label">Expected close</div><div style={{ color: "var(--text-soft)", fontSize: 12 }}>{selectedDeal.closeDate}</div></div><div><div className="field-label">Deal ID</div><div style={{ color: "var(--text-soft)", fontSize: 12 }}>{selectedDeal.id}</div></div></div></div> : null}
       </Modal>
+    <Modal
+  open={modal === "connect-whatsapp"}
+  title="Connect WhatsApp"
+  subtitle="Choose how you want to integrate WhatsApp."
+  onClose={closeModal}
+  footer={
+    <button
+      type="button"
+      className="button button-secondary"
+      onClick={closeModal}
+    >
+      Cancel
+    </button>
+  }
+>
+  <div className="form-stack">
+    <button
+      type="button"
+      className="button button-secondary"
+      style={{
+        width: "100%",
+        minHeight: 52,
+        whiteSpace: "normal",
+      }}
+      onClick={() => {
+        closeModal();
 
+        // Add your Free WhatsApp integration flow here.
+        notify(
+          "Free WhatsApp integration",
+          "This integration is not configured yet."
+        );
+      }}
+    >
+      <Plug size={18} />
+      Integration with Free WhatsApp
+    </button>
+
+    <button
+      type="button"
+      className="button button-primary"
+      style={{
+        width: "100%",
+        minHeight: 52,
+        whiteSpace: "normal",
+      }}
+      onClick={() => {
+        closeModal();
+
+        // Add your Meta WhatsApp integration flow here.
+        notify(
+          "Meta WhatsApp integration",
+          "This integration is not configured yet."
+        );
+      }}
+    >
+      <Plug size={18} />
+      Integration with Meta WhatsApp
+    </button>
+  </div>
+</Modal>
       <ToastRegion toasts={toasts} onDismiss={dismissToast} />
     </DashboardShell>
   );
