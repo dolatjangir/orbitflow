@@ -1,0 +1,7 @@
+import { ChevronRight } from "lucide-react";
+import type { Contact } from "@/types/contact";
+import { EmptyState } from "@/components/ui/dashboard/empty-state";
+
+export function ContactsTable({ contacts, onEdit }: { contacts: Contact[]; onEdit: (contact: Contact) => void }) {
+  return <div className="section-panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Contact</th><th>Company</th><th>Preferred channel</th><th>Status</th><th>Added on</th><th /></tr></thead><tbody>{contacts.map((contact) => <tr key={contact.id}><td><div className="table-name"><span className="person-avatar">{contact.name.split(" ").map((s) => s[0]).join("")}</span><span>{contact.name}<span className="table-subtext">{contact.email}</span></span></div></td><td>{contact.company}</td><td>{contact.channel}</td><td><span className={`status-pill ${contact.status === "Active" ? "success" : contact.status === "Engaged" ? "warning" : ""}`}>{contact.status}</span></td><td>{contact.added}</td><td><button className="icon-button" aria-label={`View ${contact.name}`} onClick={() => onEdit(contact)}><ChevronRight size={15} /></button></td></tr>)}</tbody></table></div>{contacts.length === 0 ? <EmptyState title="No contacts found" body="Try a different search or add a new contact." /> : null}<div className="table-footer"><span>Showing {contacts.length} contact{contacts.length === 1 ? "" : "s"}</span><span>Demo data · synced just now</span></div></div>;
+}

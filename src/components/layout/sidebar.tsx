@@ -6,7 +6,7 @@ import {
   FileText, Headphones, LayoutDashboard, Layers3, Mail, MessageCircle, Plug,
   Send, ShieldCheck, Smartphone, Users, PhoneCall, X,
 } from "lucide-react";
-import { navigationGroups } from "@/lib/data";
+import { navigationGroups } from "@/data/navigation";
 
 type Props = {
   section: string;

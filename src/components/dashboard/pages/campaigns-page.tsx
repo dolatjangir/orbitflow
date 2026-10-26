@@ -1,0 +1,14 @@
+import { Activity, CheckCircle2, ChevronRight, Download, Filter, Plus, Send, CalendarClock } from "lucide-react";
+import { PageHeader } from "@/components/ui/dashboard/page-header";
+import { MetricCard } from "@/components/ui/dashboard/metric-card";
+import type { ToastFn } from "@/components/layout/topbar";
+import { sampleCampaigns } from "@/data/campaigns";
+
+export function CampaignsPage({ campaigns, onCreate, onExport, onToast }: { campaigns: Array<{ name: string; channel: string; audience: string; status: string; date: string }>; onCreate: () => void; onExport: () => void; onToast: ToastFn }) {
+  return <><PageHeader eyebrow="Campaign studio" title="Campaigns" subtitle="Bring every customer touchpoint together. Draft, schedule, and review communication campaigns." actions={<><button className="button button-outline" onClick={onExport}><Download size={14} /> Export</button><button className="button button-primary" onClick={onCreate}><Plus size={14} /> New campaign</button></>} />
+    <div className="stats-grid"><MetricCard label="Total campaigns" value={String(campaigns.length + 12)} detail="Created across the workspace" icon={Send} /><MetricCard label="Active campaigns" value="3" detail="Running or scheduled" icon={Activity} /><MetricCard label="Average delivery" value="98.2%" detail="Across connected channels" icon={CheckCircle2} /><MetricCard label="Scheduled next" value="4" detail="Upcoming in the next 7 days" icon={CalendarClock} accent /></div>
+    <div className="section-panel table-panel"><div className="table-toolbar"><div><h2 className="panel-title">All campaigns</h2><p className="panel-description">Sample records and campaigns created in this session</p></div><div className="table-toolbar-right"><button className="button button-secondary button-sm" onClick={() => onToast("Filters", "Campaign status and channel filters can be connected to your API as the campaign table grows.")}><Filter size={13} /> Filters</button></div></div>
+      <div className="table-scroll"><table className="data-table"><thead><tr><th>Campaign</th><th>Channel</th><th>Audience</th><th>Status</th><th>Updated</th><th /></tr></thead><tbody>{[...sampleCampaigns, ...campaigns].map((campaign, i) => <tr key={`${campaign.name}-${i}`}><td><div className="table-name"><span className="person-avatar"><Send size={13} /></span><span>{campaign.name}<span className="table-subtext">CAM-{String(127 + i).padStart(4, "0")}</span></span></div></td><td>{campaign.channel}</td><td>{campaign.audience}</td><td><span className={`status-pill ${campaign.status === "Completed" ? "success" : campaign.status === "Draft" ? "" : "warning"}`}>{campaign.status}</span></td><td>{campaign.date}</td><td><button className="icon-button" aria-label={`Open ${campaign.name}`} onClick={() => onToast(campaign.name, "Campaign detail view is ready to connect to your campaign API.")}><ChevronRight size={15} /></button></td></tr>)}</tbody></table></div>
+    </div>
+  </>;
+}

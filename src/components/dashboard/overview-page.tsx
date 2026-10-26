@@ -6,15 +6,17 @@ import {
   Sparkles, TrendingUp, Wallet, X, ChartNoAxesCombined, Users, BriefcaseBusiness,
   Mail, PhoneCall,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { activityItems, onboardingSteps } from "@/lib/data";
+import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import { overviewStats } from "@/data/analytics";
+import { overviewCampaigns } from "@/data/campaigns";
+import { activityItems } from "@/data/activity";
+import { onboardingSteps } from "@/data/onboarding";
 
-const statData = [
-  { label: "Total contacts", value: "12,840", change: "+12.8%", direction: "up", note: "vs. previous 30 days", icon: Users, series: "0,22 10,17 20,20 30,10 40,15 50,8 60,11 70,2 80,6" },
-  { label: "Messages delivered", value: "48,296", change: "+8.4%", direction: "up", note: "delivery rate 98.2%", icon: Send, series: "0,20 10,22 20,13 30,18 40,8 50,13 60,4 70,9 80,1" },
-  { label: "Engagement rate", value: "31.6%", change: "−2.1%", direction: "down", note: "across all channels", icon: TrendingUp, series: "0,3 10,7 20,4 30,10 40,12 50,9 60,18 70,16 80,23" },
-  { label: "Open opportunities", value: "₹2.4L", change: "+16.2%", direction: "up", note: "weighted pipeline value", icon: BriefcaseBusiness, series: "0,24 10,18 20,21 30,14 40,12 50,16 60,7 70,10 80,1" },
-];
+
+
+
+const overviewStatIcons: Record<string, LucideIcon> = { Users, Send, TrendingUp, BriefcaseBusiness };
 
 export type OverviewHandlers = {
   onExport: () => void;
@@ -82,11 +84,7 @@ export function OverviewPage({ onExport, onCampaign, onStep, onAssistant, onToas
   const progress = Math.round(completed / onboardingSteps.length * 100);
   const currentStep = onboardingSteps.find((step) => !steps.includes(step.id))?.id ?? "agent";
 
-  const latestCampaign = useMemo(() => [
-    { name: "Autumn product update", channel: "WhatsApp", audience: "1,248 contacts", delivered: "98.2%", status: "Completed", tone: "success" },
-    { name: "October newsletter", channel: "Email", audience: "4,820 contacts", delivered: "42.6% open rate", status: "In review", tone: "warning" },
-    { name: "Order follow-up", channel: "SMS", audience: "326 contacts", delivered: "96.8%", status: "Completed", tone: "success" },
-  ], []);
+  const latestCampaign = overviewCampaigns;
 
   const toggleStep = (id: string) => setSteps((current) => current.includes(id) ? current.filter((step) => step !== id) : [...current, id]);
 
@@ -121,8 +119,8 @@ export function OverviewPage({ onExport, onCampaign, onStep, onAssistant, onToas
       </section> : <button className="button button-secondary" style={{ marginBottom: 20 }} onClick={() => setOnboardingVisible(true)}><Sparkles size={14} /> Show setup checklist <ChevronRight size={13} /></button>}
 
       <section className="stats-grid" aria-label="Workspace metrics">
-        {statData.map((stat) => {
-          const Icon = stat.icon;
+        {overviewStats.map((stat) => {
+          const Icon = overviewStatIcons[stat.icon];
           return <article className="section-panel stat-card" key={stat.label}>
             <div className="stat-top"><span className="stat-icon"><Icon size={17} /></span><svg className="stat-spark" viewBox="0 0 82 29" aria-hidden="true"><polyline points={stat.series} transform="translate(0 2)" fill="none" stroke={stat.direction === "down" ? "var(--accent)" : "var(--primary)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
             <div className="stat-value-row"><span className="stat-value">{stat.value}</span><span className={`stat-change ${stat.direction === "down" ? "negative" : ""}`}>{stat.direction === "down" ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}{stat.change}</span></div>
