@@ -17,16 +17,38 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
+    const { login } = useAuth();
+  const router = useRouter();
+
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
 
-    // Connect your authentication API here.
-    setNotice("Connect your authentication service to enable sign-in.");
+    try {
+      await login(email, password);
+      router.replace("/"); 
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to log in"
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleAction(action: string) {
@@ -370,6 +392,8 @@ export default function LoginPage() {
                   id="login-email"
                   name="email"
                   type="email"
+                    value={email}
+        onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username"
                   placeholder="you@company.com"
                   required
@@ -381,6 +405,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="login-password"
+                
                 className="login-password-label mb-2 block text-sm font-semibold sm:text-base"
               >
                 Password
@@ -396,6 +421,8 @@ export default function LoginPage() {
                 <input
                   id="login-password"
                   name="password"
+                      value={password}
+        onChange={(e) => setPassword(e.target.value)}
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="Enter your password"
