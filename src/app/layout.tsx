@@ -25,14 +25,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-                <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem storageKey="orbitflow-theme" disableTransitionOnChange>
+        <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem storageKey="orbitflow-theme" disableTransitionOnChange>
 
-        <AuthProvider>
-          <AuthGuard>
-          {children}
-        </AuthGuard>
-        </AuthProvider>
-                </ThemeProvider>
+          <AuthProvider>
+            <AuthGuard>
+              {children}
+            </AuthGuard>
+          </AuthProvider>
+        </ThemeProvider>
 
       </body>
     </html>

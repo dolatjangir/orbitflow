@@ -13,7 +13,7 @@ type Props = {
 };
 
 export function ContactsPage({ meta, contacts, filteredContacts, searchValue, setSearchValue, contactFilter, setContactFilter, onExport, onAddContact, onSelectContact }: Props) {
-  console.log("hello")
+  console.log("hello world")
   return <>
     <PageHeader eyebrow={meta.eyebrow} title={meta.title} subtitle={meta.subtitle} actions={<><button className="button button-outline" onClick={onExport}><Download size={14} /> Export CSV</button><button className="button button-primary" onClick={onAddContact}><Plus size={14} /> Add contact</button></>} />
     <div className="stats-grid"><MetricCard label="Total contacts" value={String(contacts.length + 12833)} detail="Across connected channels" icon={Users} /><MetricCard label="Active contacts" value={String(contacts.filter((contact) => contact.status === "Active").length + 8200)} detail="Reachable and opted in" icon={CheckCircle2} /><MetricCard label="Engaged this month" value="2,480" detail="Opened or replied recently" icon={Activity} /><MetricCard label="New this week" value={String(contacts.length)} detail="Sample data in this workspace" icon={ContactRound} accent /></div>
