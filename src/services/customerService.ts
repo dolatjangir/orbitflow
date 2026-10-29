@@ -64,3 +64,35 @@ export async function getCustomers(filters: CustomerFilters = {}) {
     ),
   };
 }
+
+
+
+export type CustomerActionPayload = {
+  isFavourite?: boolean;
+  LeadTemperature?: "hot" | "warm" | "cold";
+};
+
+export async function updateCustomer(
+  id: string,
+  payload: CustomerActionPayload
+) {
+  const response = await fetch(API_ROUTES.CUSTOMER.UPDATE(id), {
+    method: "PUT",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      result?.message || `Customer update failed (${response.status})`
+    );
+  }
+
+  return result;
+}
