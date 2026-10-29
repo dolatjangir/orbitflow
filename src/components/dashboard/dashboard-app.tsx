@@ -195,7 +195,21 @@ const connectChannel = (name: string) => {
         <div className="page-wrap">
           {section === "overview" ? <OverviewPage onExport={exportData} onCampaign={() => openCampaign()} onStep={openStep} onAssistant={openAssistant} onToast={notify} /> : null}
 
-          {section === "contacts" ? <ContactsPage meta={meta} contacts={contacts} filteredContacts={filteredContacts} searchValue={searchValue} setSearchValue={setSearchValue} contactFilter={contactFilter} setContactFilter={setContactFilter} onExport={exportData} onAddContact={() => setModal("contact")} onSelectContact={(contact) => { setSelectedContact(contact); notify(contact.name, `${contact.company} · ${contact.email} · ${contact.channel}`); }} /> : null}
+       
+{section === "contacts" ? (
+  <ContactsPage
+    meta={meta}
+    onExport={exportData}
+    onAddContact={() => setModal("contact")}
+    onSelectContact={(contact) => {
+      setSelectedContact(contact);
+      notify(
+        contact.name,
+        `${contact.company} · ${contact.email} · ${contact.channel}`
+      );
+    }}
+  />
+) : null}
 
           {section === "deals" ? <DealsPage meta={meta} deals={deals} filteredDeals={filteredDeals} searchValue={searchValue} setSearchValue={setSearchValue} onExport={exportData} onAddDeal={() => setModal("deal")} onSelectDeal={(deal) => { setSelectedDeal(deal); notify(deal.name, `${deal.company} · ${formatCurrency(deal.value)} · ${deal.stage}`); }} /> : null}
 
