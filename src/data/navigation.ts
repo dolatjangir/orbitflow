@@ -7,6 +7,7 @@ export const navigationGroups = [
       { label: "Deals", href: "/deals", icon: "briefcase", badge: "₹" },
       { label: "Campaigns", href: "/campaigns", icon: "send", badge: "" },
       { label: "Analytics", href: "/analytics", icon: "chart", badge: "" },
+       { label: "Inbox", href: "/inbox", icon: "users", badge: "" },
     ],
   },
   {
