@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent,type ReactNode } from "react";
 import {
   ArrowRight, Bot, Check, LayoutDashboard, Plus, Send, Sparkles, Users, Wallet, Plug, ChartNoAxesCombined
 } from "lucide-react";
@@ -33,9 +33,10 @@ import { onboardingSteps } from "@/data/onboarding";
 import { routeMeta } from "@/data/route-meta";
 import type { Contact } from "@/types/contact";
 import type { Deal } from "@/types/deal";
+import InboxWorkspace from "./pages/InboxWorkspace";
 
 type ModalName = "campaign" | "credits" | "tutorials" | "assistant" | "step" | "contact" | "deal" | "agent" | "connect-whatsapp" | null;
-type Props = { initialSection: string };
+type Props = { initialSection: string , children: ReactNode };
 
 function getSection(raw: string) {
   if (raw === "support") return "help";
@@ -43,7 +44,7 @@ function getSection(raw: string) {
 }
 
 
-export function DashboardApp({ initialSection }: Props) {
+export function DashboardApp({ initialSection, children }: Props) {
   const section = getSection(initialSection);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -192,7 +193,8 @@ const connectChannel = (name: string) => {
       sidebar={<Sidebar section={section} collapsed={sidebarCollapsed} mobileOpen={mobileSidebarOpen} onToggleCollapse={() => setSidebarCollapsed((value) => !value)} onCloseMobile={() => setMobileSidebarOpen(false)} />}
       topbar={<Topbar section={section} walletBalance={walletBalance} onOpenAssistant={openAssistant} onOpenCredits={openCredits} onOpenCampaign={() => openCampaign()} onOpenTutorials={openTutorials} onToast={notify} onMobileMenu={() => setMobileSidebarOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} />}
     >
-        <div className="page-wrap">
+       <div className={section === "inbox" ? "min-w-0" : "page-wrap"}>
+         {section === "inbox" ? <InboxWorkspace /> : null}
           {section === "overview" ? <OverviewPage onExport={exportData} onCampaign={() => openCampaign()} onStep={openStep} onAssistant={openAssistant} onToast={notify} /> : null}
 
        
@@ -215,14 +217,37 @@ const connectChannel = (name: string) => {
 
           {section === "campaigns" ? <CampaignsPage campaigns={campaigns} onCreate={() => openCampaign()} onExport={exportData} onToast={notify} /> : null}
           {section === "analytics" ? <AnalyticsPage onExport={exportData} /> : null}
-          {["whatsapp", "sms", "rcs", "email", "voice"].includes(section) ? <ChannelPage section={section} onConnect={connectChannel} onCampaign={() => openCampaign("", section === "voice" ? "WhatsApp" : section === "whatsapp" ? "WhatsApp" : section === "sms" ? "SMS" : section.toUpperCase() === "RCS" ? "RCS" : section.charAt(0).toUpperCase() + section.slice(1))} /> : null}
+    {["whatsapp", "sms", "rcs", "email", "voice"].includes(section) && (
+  (section === "whatsapp" || section === "email") && children ? (
+    children
+  ) : (
+    <ChannelPage
+      section={section}
+      onConnect={connectChannel}
+      onCampaign={() =>
+        openCampaign(
+          "",
+          section === "voice"
+            ? "WhatsApp"
+            : section === "whatsapp"
+              ? "WhatsApp"
+              : section === "sms"
+                ? "SMS"
+                : section === "rcs"
+                  ? "RCS"
+                  : "Email"
+        )
+      }
+    />
+  )
+)}
           {section === "chatbot" ? <AgentsPage onCreate={() => setModal("agent")} onAssistant={openAssistant} onToast={notify} /> : null}
           {section === "templates" ? <TemplatesPage onUse={(name, channel) => openCampaign(name, channel)} onToast={notify} /> : null}
           {section === "integrations" ? <IntegrationsPage onToast={notify} /> : null}
           {section === "settings" ? <SettingsPage onToast={notify} /> : null}
           {section === "help" ? <HelpPage onTutorials={openTutorials} onToast={notify} /> : null}
 
-          {!(["overview", "contacts", "deals", "campaigns", "analytics", "whatsapp", "sms", "rcs", "email", "voice", "chatbot", "templates", "integrations", "settings", "help"].includes(section)) ? <><PageHeader eyebrow={meta.eyebrow} title={meta.title} subtitle={meta.subtitle} /><EmptyState title="This workspace view is not configured yet" body="Use the sidebar to explore the available demo pages." action={<Link href="/" className="button button-primary">Back to overview</Link>} /></> : null}
+          {!(["overview", "contacts", "deals", "campaigns", "analytics", "whatsapp", "sms", "rcs", "email", "voice", "chatbot", "templates", "integrations", "settings", "help","inbox"].includes(section)) ? <><PageHeader eyebrow={meta.eyebrow} title={meta.title} subtitle={meta.subtitle} /><EmptyState title="This workspace view is not configured yet" body="Use the sidebar to explore the available demo pages." action={<Link href="/" className="button button-primary">Back to overview</Link>} /></> : null}
         </div>
 
       <Modal open={modal === "campaign"} title="Create a campaign" subtitle="Set up a draft campaign. Sending is disabled until a provider is connected." onClose={closeModal} footer={<><button className="button button-secondary" onClick={closeModal}>Cancel</button><button form="campaign-form" type="submit" className="button button-primary"><Plus size={14} /> Create campaign</button></>}>

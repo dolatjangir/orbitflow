@@ -15,5 +15,12 @@ export const routeMeta: Record<string, { title: string; subtitle: string; eyebro
   settings: { title: "Workspace settings", subtitle: "Manage preferences and the appearance of your OrbitFlow workspace.", eyebrow: "Preferences" },
   help: { title: "Help & support", subtitle: "Find guidance, explore tutorials, or send a note to the support team.", eyebrow: "We're here to help" },
   support: { title: "Help & support", subtitle: "Find guidance, explore tutorials, or send a note to the support team.", eyebrow: "We're here to help" },
+  inbox: {
+  eyebrow: "Conversations",
+  title: "Inbox",
+  subtitle:
+    "Manage all your conversations from different channels in one place.",
+},
+
 };
 
