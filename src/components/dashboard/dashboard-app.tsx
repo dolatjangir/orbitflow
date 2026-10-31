@@ -36,7 +36,7 @@ import type { Deal } from "@/types/deal";
 import InboxWorkspace from "./pages/InboxWorkspace";
 
 type ModalName = "campaign" | "credits" | "tutorials" | "assistant" | "step" | "contact" | "deal" | "agent" | "connect-whatsapp" | null;
-type Props = { initialSection: string , children: ReactNode };
+type Props = { initialSection: string , children?: ReactNode };
 
 function getSection(raw: string) {
   if (raw === "support") return "help";
