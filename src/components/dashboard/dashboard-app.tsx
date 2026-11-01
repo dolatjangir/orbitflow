@@ -217,8 +217,9 @@ const connectChannel = (name: string) => {
 
           {section === "campaigns" ? <CampaignsPage campaigns={campaigns} onCreate={() => openCampaign()} onExport={exportData} onToast={notify} /> : null}
           {section === "analytics" ? <AnalyticsPage onExport={exportData} /> : null}
-    {["whatsapp", "sms", "rcs", "email", "voice"].includes(section) && (
-  (section === "whatsapp" || section === "email") && children ? (
+ 
+{["whatsapp", "sms", "rcs", "email", "voice"].includes(section) && (
+  children ? (
     children
   ) : (
     <ChannelPage
@@ -241,6 +242,7 @@ const connectChannel = (name: string) => {
     />
   )
 )}
+
           {section === "chatbot" ? <AgentsPage onCreate={() => setModal("agent")} onAssistant={openAssistant} onToast={notify} /> : null}
           {section === "templates" ? <TemplatesPage onUse={(name, channel) => openCampaign(name, channel)} onToast={notify} /> : null}
           {section === "integrations" ? <IntegrationsPage onToast={notify} /> : null}

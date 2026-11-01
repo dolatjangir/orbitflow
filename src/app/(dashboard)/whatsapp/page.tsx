@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { DashboardApp } from "@/components/dashboard/dashboard-app";
+import WhatsAppPage from "@/components/dashboard/pages/whatsapp-workspace";
+import WhatsAppConnected from "@/components/dashboard/pages/whatsapp-workspace-after";
 
 export const metadata: Metadata = { title: 'WhatsApp workspace', description: 'Prepare WhatsApp customer messaging experiences.' };
 
 export default function WhatsappPage() {
-  return <DashboardApp initialSection="whatsapp" />;
+  return <DashboardApp initialSection="whatsapp">
+
+    <WhatsAppConnected/>
+  </DashboardApp>;
 }

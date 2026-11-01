@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { DashboardApp } from "@/components/dashboard/dashboard-app";
+import RCSWorkspace from "@/components/dashboard/pages/rcs-workspace";
+import RCSConnected from "@/components/dashboard/pages/rcs-workspace-after";
 
 export const metadata: Metadata = { title: 'RCS workspace', description: 'Explore branded rich mobile messaging.' };
 
 export default function RcsPage() {
-  return <DashboardApp initialSection="rcs" />;
+  return <DashboardApp initialSection="rcs">
+    {/* <RCSWorkspace/> */}
+    <RCSConnected/>
+    </DashboardApp>;
 }
