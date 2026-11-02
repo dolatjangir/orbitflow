@@ -1,0 +1,33 @@
+export interface whatsappAllDataInterface {
+    name:string;
+    body:string;
+    status:string;
+}
+
+export interface whatsappGetDataInterface {
+    _id: string;
+    name:string;
+    status?:string;
+    body?:string;
+    image?:string;
+}
+
+
+export interface whatsappAllCustomerInterface {
+    templateId: string,
+    customerIds: string[],
+    sendToAll?: boolean;
+}
+export interface whatsappAllContactInterface {
+    templateId: string,
+    contactIds: string[]
+}
+
+export interface whatsappDialogDataInterface {
+    id: string;
+    name:string;
+    status:string;
+  }
+ 
+
+  
