@@ -3,7 +3,7 @@
 import { useId } from "react";
 
 type EmailWorkspaceProps = {
-  onConnect: () => void;
+  onConnect?: () => void;
   privacyHref: string;
 };
 
