@@ -140,6 +140,8 @@ const [channel, setChannel] =
 
 const [selectedId, setSelectedId] =
   useState<string | null>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] =
+  useState<Set<string>>(new Set());
 
 const [whatsappLoading, setWhatsappLoading] = useState(false);
 const [whatsappError, setWhatsappError] = useState("");
@@ -532,35 +534,113 @@ function changeChannel(next: InboxChannel) {
     void loadBaileysChat(firstConversation);
   }
 
+  if (next !== "baileys") {
+  setSelectedCustomerIds(new Set());
+}
+
   setMobileChat(false);
   setShowContact(false);
 }
+// Toggle one WhatsApp customer.
+function toggleCustomerSelection(id: string) {
+  setSelectedCustomerIds((current) => {
+    const next = new Set(current);
 
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+
+    return next;
+  });
+}
+
+// Select or deselect all currently visible WhatsApp customers.
+function toggleVisibleCustomers(ids: string[]) {
+  setSelectedCustomerIds((current) => {
+    const allSelected =
+      ids.length > 0 && ids.every((id) => current.has(id));
+
+    const next = new Set(current);
+
+    ids.forEach((id) => {
+      if (allSelected) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+    });
+
+    return next;
+  });
+}
   function openModal(kind: ModalKind) {
     setFormError("");
     setModal(kind);
   }
+
+  function getWhatsAppTargetIds(): string[] {
+  const targets =
+    selectedCustomerIds.size > 0
+      ? conversations.filter(
+          (item) =>
+            item.channel === "baileys" &&
+            selectedCustomerIds.has(item.id),
+        )
+      : selected
+        ? [selected]
+        : [];
+
+  if (!targets.length) {
+    throw new Error("Please select at least one WhatsApp customer.");
+  }
+
+  const blockedCustomers = targets.filter((item) => item.blocked);
+
+  if (blockedCustomers.length > 0) {
+    throw new Error(
+      "One or more selected customers are blocked. Remove them from selection or unblock them.",
+    );
+  }
+
+  return targets.map((item) => item.id);
+}
+
 
 async function sendMessage(
   text: string,
   files: File[],
   email?: { to: string; subject: string },
 ) {
-  if (!selected || selected.blocked) {
-    throw new Error("This conversation is unavailable.");
+  if (!selected) {
+    throw new Error("Please select a conversation.");
   }
 
   const destination = selected;
 
-  // Real Baileys WhatsApp sending.
+  // ==========================================
+  // BAILEYS WHATSAPP - SINGLE / MULTIPLE SEND
+  // ==========================================
   if (destination.channel === "baileys") {
+    // Your existing API supports one attachment per request.
     if (files.length > 1) {
       throw new Error(
-        "The existing WhatsApp API accepts one attachment per message. Please remove the extra files.",
+        "Please attach only one file per WhatsApp message.",
       );
     }
 
+    // Reuse the existing helper.
+    // It returns selected CRM customer IDs, or the active
+    // customer's ID when no checkbox selection exists.
+    // It also validates blocked customers.
+    const targetIds = getWhatsAppTargetIds();
+
     const file = files[0];
+
+    if (!file && !text.trim()) {
+      throw new Error("Message cannot be empty.");
+    }
 
     const mediaType = !file
       ? "text"
@@ -575,30 +655,41 @@ async function sendMessage(
     formData.append("message", text);
     formData.append("mediaType", mediaType);
 
-    // destination.id is the actual CRM customer _id.
+    // Send all selected CRM customer IDs.
     formData.append(
       "customerIds",
-      JSON.stringify([destination.id]),
+      JSON.stringify(targetIds),
     );
 
     if (file) {
       formData.append("whatsappFile", file);
     }
 
+    // Use your existing WhatsApp sending API.
     const response = await sendDirectMessageApi(formData);
 
     if (!response?.success) {
       throw new Error(
-        response?.message || "WhatsApp message could not be sent.",
+        response?.message ||
+          "WhatsApp message could not be sent. Please try again.",
       );
     }
 
-    // Do not add a fake/local message here.
-    // The actual saved message is added by whatsapp:message.
+    // Clear selection only after successful API response.
+    setSelectedCustomerIds(new Set());
+
+    // Do not create a fake local message.
+    // The actual message comes through your WhatsApp socket.
     return;
   }
 
-  // Keep your existing integration callback for other channels.
+  // ==========================================
+  // OTHER CHANNELS - EXISTING BEHAVIOUR
+  // ==========================================
+  if (destination.blocked) {
+    throw new Error("This conversation is blocked.");
+  }
+
   if (!onSendMessage) {
     throw new Error(
       "Sending is not configured for this channel.",
@@ -606,7 +697,9 @@ async function sendMessage(
   }
 
   const emailSubject =
-    destination.channel === "email" ? email?.subject : undefined;
+    destination.channel === "email"
+      ? email?.subject
+      : undefined;
 
   const message: InboxMessage = await onSendMessage({
     conversationId: destination.id,
@@ -637,18 +730,24 @@ async function sendMessage(
     ),
   );
 }
+
+
 async function sendWhatsAppSpecial(payload: WhatsAppSpecialPayload) {
-  if (!selected || selected.channel !== "baileys" || selected.blocked) {
+  if (!selected || selected.channel !== "baileys") {
     throw new Error("This WhatsApp conversation is unavailable.");
   }
 
-  const destination = selected;
+  const targetIds = getWhatsAppTargetIds();
+
   const formData = new FormData();
 
-  // Match the existing CRM WhatsApp endpoint's field names exactly.
   formData.append("message", "");
   formData.append("mediaType", payload.mediaType);
-  formData.append("customerIds", JSON.stringify([destination.id]));
+
+  formData.append(
+    "customerIds",
+    JSON.stringify(targetIds),
+  );
 
   if (payload.mediaType === "poll") {
     formData.append("poll", JSON.stringify(payload.poll));
@@ -660,11 +759,12 @@ async function sendWhatsAppSpecial(payload: WhatsAppSpecialPayload) {
 
   if (!response?.success) {
     throw new Error(
-      response?.message || `WhatsApp ${payload.mediaType} could not be sent.`,
+      response?.message ||
+        `WhatsApp ${payload.mediaType} could not be sent.`,
     );
   }
 
-  // The saved message is supplied by the existing inbox API/socket flow.
+  setSelectedCustomerIds(new Set());
 }
 
   function saveModal(event: FormEvent<HTMLFormElement>) {
@@ -1076,17 +1176,24 @@ if (nextChannel === "baileys") {
 
         {/* Main inbox grid */}
         <div className="relative grid min-h-[500px] flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] @[720px]:min-h-[600px] @[720px]:grid-cols-[280px_minmax(0,1fr)] @[1180px]:grid-cols-[300px_minmax(0,1fr)_290px]">
-          <ConversationList
-            channelConversations={channelConversations}
-            visibleConversations={visibleConversations}
-            selectedId={selectedId}
-            mobileChat={mobileChat}
-            search={search}
-            setSearch={setSearch}
-            unreadOnly={unreadOnly}
-            setUnreadOnly={setUnreadOnly}
-            selectConversation={selectConversation}
-          />
+  <ConversationList
+  channelConversations={channelConversations}
+  visibleConversations={visibleConversations}
+  selectedId={selectedId}
+  mobileChat={mobileChat}
+  search={search}
+  setSearch={setSearch}
+  unreadOnly={unreadOnly}
+  setUnreadOnly={setUnreadOnly}
+  selectConversation={selectConversation}
+  multiSelectEnabled={channel === "baileys"}
+  selectedCustomerIds={selectedCustomerIds}
+  onToggleCustomerSelection={toggleCustomerSelection}
+  onToggleVisibleCustomers={toggleVisibleCustomers}
+  onClearCustomerSelection={() =>
+    setSelectedCustomerIds(new Set())
+  }
+/>
 
           {/* Keep chat instances mounted so drafts survive switching */}
           <div
@@ -1105,6 +1212,11 @@ if (nextChannel === "baileys") {
                 <InboxChat
                   conversation={conversation}
                   localMode={false}
+                   selectedCustomerCount={
+    conversation.channel === "baileys"
+      ? selectedCustomerIds.size
+      : 0
+  }
                   onSend={sendMessage}
                   onSendWhatsAppSpecial={sendWhatsAppSpecial}
                   onWhatsAppRefresh={() => loadBaileysChat(conversation)}
@@ -1113,6 +1225,10 @@ if (nextChannel === "baileys") {
                       starred: !conversation.starred,
                     })
                   }
+                  selectedCustomerIds={Array.from(selectedCustomerIds)}
+onClearCustomerSelection={() =>
+  setSelectedCustomerIds(new Set())
+}
                   onAddTag={() => openModal("tag")}
                   onShowContact={() => setShowContact(true)}
                   onBack={() => setMobileChat(false)}
@@ -1176,6 +1292,7 @@ if (nextChannel === "baileys") {
             </div>
           ) : (
             <form onSubmit={saveModal} className="space-y-4">
+              
               {modal === "new" ? (
                 <>
                   <label className="block space-y-2 text-xs font-semibold">

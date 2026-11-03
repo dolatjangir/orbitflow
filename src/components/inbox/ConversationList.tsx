@@ -13,11 +13,28 @@ type ConversationListProps = {
   unreadOnly: boolean;
   setUnreadOnly: (updater: (value: boolean) => boolean) => void;
   selectConversation: (conversation: InboxConversation) => void;
+  multiSelectEnabled: boolean;
+selectedCustomerIds: Set<string>;
+onToggleCustomerSelection: (id: string) => void;
+onToggleVisibleCustomers: (ids: string[]) => void;
+onClearCustomerSelection: () => void;
 };
 
 export default function ConversationList({
-  channelConversations, visibleConversations, selectedId, mobileChat, search,
-  setSearch, unreadOnly, setUnreadOnly, selectConversation,
+  channelConversations,
+  visibleConversations,
+  selectedId,
+  mobileChat,
+  search,
+  setSearch,
+  unreadOnly,
+  setUnreadOnly,
+  selectConversation,
+  multiSelectEnabled,
+  selectedCustomerIds,
+  onToggleCustomerSelection,
+  onToggleVisibleCustomers,
+  onClearCustomerSelection,
 }: ConversationListProps) {
   return (
     <>
@@ -62,61 +79,112 @@ export default function ConversationList({
                   aria-label="Search conversations"
                   className={`${FIELD} pl-9 text-xs`}
                 />
+                {multiSelectEnabled && (
+  <div className="mt-3 flex items-center justify-between gap-2">
+    <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-soft)]">
+      <input
+        type="checkbox"
+        checked={
+          visibleConversations.length > 0 &&
+          visibleConversations.every((item) =>
+            selectedCustomerIds.has(item.id),
+          )
+        }
+        onChange={() =>
+          onToggleVisibleCustomers(
+            visibleConversations.map((item) => item.id),
+          )
+        }
+        className="size-4 accent-[var(--primary)]"
+      />
+      Select all visible ({visibleConversations.length})
+    </label>
+
+    {selectedCustomerIds.size > 0 && (
+      <button
+        type="button"
+        onClick={onClearCustomerSelection}
+        className="text-xs font-semibold text-[var(--primary)]"
+      >
+        Clear ({selectedCustomerIds.size})
+      </button>
+    )}
+  </div>
+)}
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-              {visibleConversations.map((conversation) => {
-                const active = selectedId === conversation.id;
+         {visibleConversations.map((conversation) => {
+  const active = selectedId === conversation.id;
+  const checked = selectedCustomerIds.has(conversation.id);
 
-                return (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => selectConversation(conversation)}
-                    aria-current={active ? "true" : undefined}
-                    className={[
-                      "flex w-full items-center gap-3 border-r-2 px-4 py-3 text-left",
-                      active
-                        ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                        : "border-transparent hover:bg-[var(--surface-2)]",
-                    ].join(" ")}
-                  >
-                    <Avatar name={conversation.name} />
+  return (
+    <div
+      key={conversation.id}
+      className="flex items-center border-b border-[var(--border)]"
+    >
+      {multiSelectEnabled && (
+        <div className="pl-3">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() =>
+              onToggleCustomerSelection(conversation.id)
+            }
+            aria-label={`Select ${conversation.name}`}
+            className="size-4 cursor-pointer accent-[var(--primary)]"
+          />
+        </div>
+      )}
 
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[13px] font-bold">
-                          {conversation.name}
-                        </span>
+      <button
+        type="button"
+        onClick={() => selectConversation(conversation)}
+        aria-current={active ? "true" : undefined}
+        className={[
+          "flex min-w-0 flex-1 items-center gap-3 border-r-2 px-4 py-3 text-left",
+          active
+            ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+            : "border-transparent hover:bg-[var(--surface-2)]",
+        ].join(" ")}
+      >
+        <Avatar name={conversation.name} />
 
-                        <span className="shrink-0 text-[10px] text-[var(--muted)]">
-                          {timeLabel(lastActivity(conversation))}
-                        </span>
-                      </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="truncate text-[13px] font-bold">
+              {conversation.name}
+            </span>
 
-                      <span className="mt-1 flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">
-                          {preview(conversation)}
-                        </span>
+            <span className="shrink-0 text-[10px] text-[var(--muted)]">
+              {timeLabel(lastActivity(conversation))}
+            </span>
+          </span>
 
-                        {conversation.starred && (
-                          <Star
-                            size={12}
-                            className="shrink-0 fill-[var(--primary)] text-[var(--primary)]"
-                          />
-                        )}
+          <span className="mt-1 flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">
+              {preview(conversation)}
+            </span>
 
-                        {conversation.unread > 0 && (
-                          <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--primary)] text-[10px] text-white">
-                            {conversation.unread}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+            {conversation.starred && (
+              <Star
+                size={12}
+                className="shrink-0 fill-[var(--primary)] text-[var(--primary)]"
+              />
+            )}
+
+            {conversation.unread > 0 && (
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--primary)] text-[10px] text-white">
+                {conversation.unread}
+              </span>
+            )}
+          </span>
+        </span>
+      </button>
+    </div>
+  );
+})}
 
               {visibleConversations.length === 0 && (
                 <p className="px-5 py-10 text-center text-xs text-[var(--muted)]">

@@ -42,7 +42,7 @@ import {
   timeLabel,
   FIELD,
   ICON_BUTTON,
-  WhatsAppSpecialPayload,
+ type WhatsAppSpecialPayload,
 } from "./inbox.shared";
 import WhatsAppTemplatePicker from "../WhatsappTemplatePicker";
 
@@ -125,6 +125,9 @@ export function InboxChat({
   onShowContact,
   onBack,
   localMode = false,
+  selectedCustomerCount = 0,
+  selectedCustomerIds = [],
+  onClearCustomerSelection,
 }: ChatProps) {
   const [draft, setDraft] = useState("");
   const [emailTo, setEmailTo] = useState(conversation?.contact ?? "");
@@ -333,7 +336,14 @@ export function InboxChat({
   };
 
   const canSubmit = (() => {
-    if (!conversation || conversation.blocked || sending) return false;
+    if (
+  !conversation ||
+  (conversation.blocked &&
+    !(isWhatsApp && selectedCustomerCount > 0)) ||
+  sending
+) {
+  return false;
+}
 
     if (composerView === "poll") {
       return (
@@ -351,7 +361,7 @@ export function InboxChat({
     if (isEmail) {
       return (
         (draft.trim().length > 0 || files.length > 0) &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo.trim()) &&
+       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo.trim()) &&
         subject.trim().length > 0
       );
     }
@@ -362,7 +372,14 @@ export function InboxChat({
   async function submit(event?: FormEvent) {
     event?.preventDefault();
 
-    if (!conversation || conversation.blocked || sending) return;
+    if (
+  !conversation ||
+  (conversation.blocked &&
+    !(isWhatsApp && selectedCustomerCount > 0)) ||
+  sending
+) {
+  return false;
+}
 
     if (composerView === "poll" || composerView === "location") {
       setAttempted(true);
@@ -453,12 +470,15 @@ export function InboxChat({
     }
   }
 
-  const handleTemplateSent = async (message?: string) => {
-    setShowTemplates(false);
-    setNotice(message || "WhatsApp template sent.");
-    setError("");
-    await onWhatsAppRefresh?.();
-  };
+ const handleTemplateSent = async (message?: string) => {
+  setShowTemplates(false);
+  setNotice(message || "WhatsApp template sent.");
+  setError("");
+
+  onClearCustomerSelection?.();
+
+  await onWhatsAppRefresh?.();
+};
 
   const renderMessageAttachment = (message: InboxMessage) => {
     const attachment = message.attachments?.[0];
@@ -787,7 +807,8 @@ export function InboxChat({
         onSubmit={submit}
         className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] p-3"
       >
-        {conversation.blocked ? (
+       {conversation.blocked &&
+selectedCustomerCount === 0 ? (
           <div className="flex items-center justify-center gap-2 py-4 text-sm text-[var(--danger)]">
             <Ban size={17} />
             Contact blocked. Unblock to send messages.
@@ -803,6 +824,12 @@ export function InboxChat({
             {notice && (
               <p className="mb-2 text-xs text-[var(--success)]">{notice}</p>
             )}
+            {isWhatsApp && selectedCustomerCount > 0 && (
+  <div className="mb-3 rounded-lg border border-[var(--primary)]/20 bg-[var(--primary-soft)] px-3 py-2 text-xs text-[var(--primary)]">
+    The same message will be sent to{" "}
+    <strong>{selectedCustomerCount}</strong> selected WhatsApp customers.
+  </div>
+)}
 
             {composerView === "chat" && files.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -855,9 +882,11 @@ export function InboxChat({
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2.5">
                   <div>
                     <p className="text-sm font-semibold">Create poll</p>
-                    <p className="text-[10px] text-[var(--muted)]">
-                      WhatsApp poll for {conversation.name}
-                    </p>
+                   <p className="text-[10px] text-[var(--muted)]">
+  {selectedCustomerCount > 0
+    ? `Sending poll to ${selectedCustomerCount} selected customers`
+    : `WhatsApp poll for ${conversation.name}`}
+</p>
                   </div>
                   <button type="button" onClick={resetSpecialComposer} className={ICON_BUTTON} aria-label="Back to message composer">
                     <X size={16} />
@@ -1333,7 +1362,11 @@ export function InboxChat({
         <WhatsAppTemplatePicker
           isOpen={showTemplates}
           onClose={() => setShowTemplates(false)}
-          targetIds={[conversation.id]}
+          targetIds={
+  selectedCustomerIds.length > 0
+    ? selectedCustomerIds
+    : [conversation.id]
+}
           onSent={(message) => void handleTemplateSent(message)}
         />
       )}
