@@ -1,6 +1,6 @@
 "use client";
 
-import EmailWorkspace from "@/components/dashboard/pages/email-workspace";
+import EmailWorkspaceSetup from "@/components/dashboard/pages/email-workspace";
 
 export function EmailPageContent() {
   // Dummy connection function
@@ -11,9 +11,6 @@ export function EmailPageContent() {
   };
 
   return (
-    <EmailWorkspace
-      onConnect={() => connectChannel("Email")}
-      privacyHref="/"
-    />
+    <EmailWorkspaceSetup  />
   );
 }
