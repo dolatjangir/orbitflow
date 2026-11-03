@@ -91,6 +91,10 @@ export type InboxWorkspaceProps = {
 
 export type ChatProps = {
   conversation: InboxConversation | null;
+  selectedCustomerCount?: number;
+
+selectedCustomerIds?: string[];
+onClearCustomerSelection?: () => void;
   onSend: (
     text: string,
     files: File[],
