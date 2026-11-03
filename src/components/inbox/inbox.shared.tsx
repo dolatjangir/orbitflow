@@ -9,6 +9,13 @@ export type InboxAttachment = {
   name: string;
   size: number;
   url?: string;
+  type?: string;
+};
+
+export type InboxLocation = {
+  lat: number | string;
+  lng: number | string;
+  name?: string;
 };
 
 export type InboxMessage = {
@@ -19,6 +26,10 @@ export type InboxMessage = {
   createdAt: string;
   status?: "local" | "sent" | "delivered" | "read";
   attachments?: InboxAttachment[];
+  mediaType?: string;
+  location?: InboxLocation;
+  pollOptions?: string[];
+  pollVotes?: Record<string, string[]>;
 };
 
 export type InboxConversation = {
@@ -47,6 +58,24 @@ export type SendMessageInput = {
   files: File[];
 };
 
+export type WhatsAppSpecialPayload =
+  | {
+      mediaType: "poll";
+      poll: {
+        name: string;
+        options: string[];
+        selectableCount: number;
+      };
+    }
+  | {
+      mediaType: "location";
+      location: {
+        lat: string;
+        lng: string;
+        name: string;
+      };
+    };
+
 /**
  * Return your server-confirmed message after successful delivery/submission.
  * Throw an Error when the request fails.
@@ -62,11 +91,15 @@ export type InboxWorkspaceProps = {
 
 export type ChatProps = {
   conversation: InboxConversation | null;
-onSend: (
-  text: string,
-  files: File[],
-  email?: { to: string; subject: string },
-) => Promise<void>;
+  onSend: (
+    text: string,
+    files: File[],
+    email?: { to: string; subject: string },
+  ) => Promise<void>;
+  onSendWhatsAppSpecial?: (
+    payload: WhatsAppSpecialPayload,
+  ) => Promise<void>;
+  onWhatsAppRefresh?: () => Promise<void> | void;
   onToggleStar: () => void;
   onAddTag: () => void;
   onShowContact: () => void;
@@ -170,93 +203,29 @@ export function preview(conversation: InboxConversation) {
   const last = conversation.messages[conversation.messages.length - 1];
 
   if (!last) return "Start a conversation";
+
+  if (last.mediaType && last.mediaType !== "text") {
+    const labels: Record<string, string> = {
+      image: "Photo",
+      video: "Video",
+      audio: "Voice message",
+      document: "Document",
+      location: "Location",
+      poll: "Poll",
+      sticker: "Sticker",
+    };
+    return labels[last.mediaType] ?? last.attachments?.[0]?.name ?? "Attachment";
+  }
+
   return last.text || last.attachments?.[0]?.name || "Attachment";
 }
 
-/* Sample data only; pass your API data through initialConversations. */
+/**
+ * Kept for backwards compatibility with callers that imported this helper.
+ * The outreach inbox must not seed itself with sample conversations.
+ */
 export function createDemoConversations(): InboxConversation[] {
-  const people = [
-    ["John Smith", "That sounds great! Do you have a demo available?"],
-    ["Sarah Wilson", "Can you share more details?"],
-    ["Michael Brown", "Thank you for the update!"],
-    ["Emily Davis", "Is this still available?"],
-    ["Robert Johnson", "Great, I'll check and get back."],
-    ["Lisa Anderson", "Do you have a demo?"],
-    ["David Lee", "Perfect, thanks!"],
-    ["Jennifer Taylor", "Looking forward to it."],
-  ];
-
-  return CHANNELS.flatMap((channel, channelIndex) =>
-    people.slice(0, channel.id === "meta" ? 8 : 3).map(([name, text], index) => {
-      const conversationId = `${channel.id}-${index}`;
-      const createdAt = "2026-10-25T09:00:00Z";
-      const latest = `2026-10-31T${String(10 - Math.min(index, 7)).padStart(
-        2,
-        "0",
-      )}:24:00Z`;
-
-      const messages: InboxMessage[] =
-        index === 0
-          ? [
-              {
-                id: `${conversationId}-1`,
-                direction: "incoming",
-                text:
-                  "Hi, I'm interested in your AI solutions.\n" +
-                  "Can you tell me more about your services?",
-                createdAt: "2026-10-31T10:20:00Z",
-              },
-              {
-                id: `${conversationId}-2`,
-                direction: "outgoing",
-                text:
-                  "Hello John! 👋\n\n" +
-                  "Thank you for your interest in our AI solutions. " +
-                  "We offer AI automation, AI agents, and custom AI workforce " +
-                  "solutions to help businesses grow efficiently.",
-                createdAt: "2026-10-31T10:22:00Z",
-                status: "read",
-              },
-              {
-                id: `${conversationId}-3`,
-                direction: "incoming",
-                text,
-                createdAt: latest,
-              },
-            ]
-          : [
-              {
-                id: `${conversationId}-1`,
-                direction: "incoming",
-                text,
-                createdAt: latest,
-              },
-            ];
-
-      return {
-        id: conversationId,
-        channel: channel.id,
-        name,
-        contact:
-          channel.id === "email"
-            ? `${name.toLowerCase().replaceAll(" ", ".")}@example.com`
-            : `+1 202 555 ${String(100 + channelIndex * 10 + index).padStart(
-                4,
-                "0",
-              )}`,
-        about: "Interested in AI automation solutions for their business.",
-        online: index === 0,
-        unread: index === 0 ? 3 : index === 1 || index === 5 ? 1 : 0,
-        starred: false,
-        blocked: false,
-        tags: index === 0 ? ["Lead", "AI Solutions", "Demo"] : ["Lead"],
-        assignedTo: "",
-        notes: [],
-        createdAt,
-        messages,
-      };
-    }),
-  );
+  return [];
 }
 
 export function Avatar({
@@ -333,4 +302,3 @@ export function Modal({
     </dialog>
   );
 }
-

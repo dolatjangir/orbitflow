@@ -1,30 +1,150 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { CalendarDays, Mail, MessageCircle, Plus, UserRound, FileText, Ban, MessageSquare, Clock3, X } from "lucide-react";
 import InboxChat from "./InboxChat";
 import ConversationList from "./ConversationList";
 import BaileysConnection from "./BaileysConnection";
 import {
   CHANNELS, ICON_BUTTON, FIELD, OUTLINE_BUTTON, PRIMARY_BUTTON, Avatar, Modal,
-  createDemoConversations, lastActivity, dateLabel, timeLabel, channelName,
-  type InboxChannel, type InboxConversation, type InboxMessage, type InboxWorkspaceProps, type ModalKind,
+  lastActivity, dateLabel, timeLabel, channelName,
+  type InboxChannel, type InboxConversation, type InboxMessage, type InboxWorkspaceProps, type ModalKind, type WhatsAppSpecialPayload,
 } from "./inbox.shared";
+import { API_URL } from "@/constants/ApiRoutes";
+import { useAuth } from "@/contexts/AuthContext";
+import { getCustomer } from "@/store/customer";
+import { sendDirectMessageApi } from "@/store/whatsapp/whatsapp";
+import { getSocket, initSocket } from "@/socket/socket";
+
+
+const WHATSAPP_INBOX_API =
+  `${API_URL}/api/v1/messages/whatsapp/inbox`;
+
+type WhatsAppApiMessage = {
+  id?: string;
+  waId?: string;
+  phoneKey?: string;
+  fromMe?: boolean;
+  type?: string;
+  body?: string;
+  fileName?: string | null;
+  status?: string;
+  timestamp?: string;
+  mediaUrl?: string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  location?: { lat?: number | string; lng?: number | string; name?: string } | null;
+  pollOptions?: string[] | null;
+  pollVotes?: Record<string, string[]> | null;
+};
+
+const phoneKeyOf = (value: unknown) =>
+  String(value ?? "").replace(/\D/g, "").slice(-10);
+
+const safeIso = (value?: string) => {
+  const date = value ? new Date(value) : new Date();
+
+  return Number.isNaN(date.getTime())
+    ? new Date().toISOString()
+    : date.toISOString();
+};
+
+async function whatsappInboxApi(
+  path: string,
+  init?: RequestInit,
+) {
+  const response = await fetch(`${WHATSAPP_INBOX_API}${path}`, {
+    credentials: "include",
+    ...init,
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      message || `WhatsApp Inbox API failed: ${response.status}`,
+    );
+  }
+
+  return response.json();
+}
+
+function mapWhatsAppMessage(
+  message: WhatsAppApiMessage,
+  fallbackId?: string,
+): InboxMessage {
+  const type = message.type || "text";
+  const validStatus = ["sent", "delivered", "read"].includes(
+    message.status || "",
+  )
+    ? (message.status as InboxMessage["status"])
+    : undefined;
+
+  const rawLocation = message.location;
+  const lat = rawLocation?.lat ?? message.lat;
+  const lng = rawLocation?.lng ?? message.lng;
+  const location =
+    type === "location" && lat != null && lng != null
+      ? {
+          lat,
+          lng,
+          name: rawLocation?.name || message.body || "Shared location",
+        }
+      : undefined;
+
+  return {
+    id: String(
+      message.waId ||
+      message.id ||
+      fallbackId ||
+      `${message.phoneKey || "whatsapp"}-${message.timestamp || Date.now()}`,
+    ),
+    direction: message.fromMe ? "outgoing" : "incoming",
+    text: message.body || "",
+    createdAt: safeIso(message.timestamp),
+    status: validStatus,
+    mediaType: type,
+    location,
+    pollOptions: message.pollOptions || undefined,
+    pollVotes: message.pollVotes || undefined,
+    attachments: message.mediaUrl
+      ? [
+          {
+            name: message.fileName || `${type} attachment`,
+            size: 0,
+            url: message.mediaUrl,
+            type,
+          },
+        ]
+      : [],
+  };
+}
 
 export default function InboxWorkspace({
   initialConversations,
   onSendMessage,
 }: InboxWorkspaceProps) {
-  const [conversations, setConversations] = useState<InboxConversation[]>(
-    () => initialConversations ?? createDemoConversations(),
-  );
+ const { admin } = useAuth();
 
-  const [channel, setChannel] = useState<InboxChannel>("meta");
+const [conversations, setConversations] =
+  useState<InboxConversation[]>(() => initialConversations ?? []);
 
-  const [selectedId, setSelectedId] = useState<string | null>(() => {
-    const initial = initialConversations ?? createDemoConversations();
-    return initial.find((item) => item.channel === "meta")?.id ?? null;
-  });
+const [channel, setChannel] =
+  useState<InboxChannel>("baileys");
+
+const [selectedId, setSelectedId] =
+  useState<string | null>(null);
+
+const [whatsappLoading, setWhatsappLoading] = useState(false);
+const [whatsappError, setWhatsappError] = useState("");
+
+const activePhoneKeyRef = useRef<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -82,31 +202,346 @@ export default function InboxWorkspace({
       current.map((item) => (item.id === id ? { ...item, ...change } : item)),
     );
   }
+const loadBaileysCustomers = useCallback(async () => {
+  setWhatsappLoading(true);
+  setWhatsappError("");
 
-  function selectConversation(conversation: InboxConversation) {
-    setSelectedId(conversation.id);
-    setMobileChat(true);
-    updateConversation(conversation.id, { unread: 0 });
-  }
+  try {
+    // Same customer API used by your old WhatsApp Inbox.
+    const customerResponse: any = await getCustomer();
 
-  function changeChannel(next: InboxChannel) {
-    setChannel(next);
-    setSearch("");
-    setUnreadOnly(false);
-    setSelectedId(
-      conversations.find((conversation) => conversation.channel === next)?.id ??
-        null,
+    // Your old page expects getCustomer() to return an array.
+    // The data fallback also handles an API response wrapped in { data: [] }.
+    const customerRows = Array.isArray(customerResponse)
+      ? customerResponse
+      : Array.isArray(customerResponse?.data)
+        ? customerResponse.data
+        : [];
+
+    if (!customerResponse) {
+      throw new Error("Unable to load CRM customers.");
+    }
+
+    // Load the real WhatsApp conversation summaries.
+    let summaries: any[] = [];
+
+    try {
+      const summaryResponse = await whatsappInboxApi("/summary");
+
+      summaries = Array.isArray(summaryResponse?.chats)
+        ? summaryResponse.chats
+        : [];
+    } catch (error) {
+      console.error("WhatsApp summary loading failed:", error);
+      setWhatsappError(
+        "CRM customers loaded, but WhatsApp chat summaries could not be loaded.",
+      );
+    }
+
+    const summaryMap = new Map<string, any>();
+
+    summaries.forEach((chat) => {
+      summaryMap.set(phoneKeyOf(chat.phoneKey), chat);
+    });
+
+    const mappedCustomers: InboxConversation[] = customerRows
+      .map((customer: any) => {
+        const id = String(customer._id ?? customer.id ?? "");
+        const phone = String(customer.ContactNumber ?? "");
+        const phoneKey = phoneKeyOf(phone);
+
+        if (!id || !phoneKey) return null;
+
+        const summary = summaryMap.get(phoneKey);
+
+        const summaryMessage = summary
+          ? mapWhatsAppMessage(
+              {
+                ...summary,
+                id: summary.waId || `summary-${phoneKey}`,
+                waId: summary.waId || `summary-${phoneKey}`,
+              },
+              `summary-${phoneKey}`,
+            )
+          : null;
+
+        return {
+          id,
+          channel: "baileys",
+          name:
+            customer.customerName ||
+            customer.CustomerName ||
+            customer.Name ||
+            "Unnamed",
+          contact: phone,
+          about: customer.Description || "",
+          online: false,
+          unread: Number(summary?.unread || 0),
+          starred: false,
+          blocked: false,
+          tags: [],
+          assignedTo: "",
+          notes: [],
+          createdAt: safeIso(
+            summary?.timestamp ||
+            customer.createdAt ||
+            customer.Date,
+          ),
+          messages: summaryMessage ? [summaryMessage] : [],
+        } satisfies InboxConversation;
+      })
+      .filter(
+        (customer:any): customer is InboxConversation => customer !== null,
+      );
+
+    // Keep other channels, but replace Baileys with real CRM customers.
+    setConversations((current) => [
+      ...current.filter((item) => item.channel !== "baileys"),
+      ...mappedCustomers,
+    ]);
+
+    setSelectedId((current) =>
+      current && mappedCustomers.some((item) => item.id === current)
+        ? current
+        : null,
     );
-    setMobileChat(false);
-    setShowContact(false);
+  } catch (error) {
+    console.error("WhatsApp customer loading failed:", error);
+    setWhatsappError(
+      error instanceof Error
+        ? error.message
+        : "Unable to load WhatsApp customers.",
+    );
+  } finally {
+    setWhatsappLoading(false);
   }
+}, []);
+
+const loadBaileysChat = useCallback(async (
+  conversation: InboxConversation,
+) => {
+  const phoneKey = phoneKeyOf(conversation.contact);
+
+  if (!phoneKey) {
+    setWhatsappError("This customer does not have a valid phone number.");
+    return;
+  }
+
+  activePhoneKeyRef.current = phoneKey;
+
+  try {
+    const response = await whatsappInboxApi(
+      `/chat/${encodeURIComponent(phoneKey)}`,
+    );
+
+    // Prevent an earlier API response from replacing a newly selected chat.
+    if (activePhoneKeyRef.current !== phoneKey) return;
+
+    const actualMessages: InboxMessage[] = Array.isArray(response?.messages)
+      ? response.messages.map((message: WhatsAppApiMessage) =>
+          mapWhatsAppMessage(message),
+        )
+      : [];
+
+    setConversations((current) =>
+      current.map((item) =>
+        item.id === conversation.id
+          ? {
+              ...item,
+              messages: actualMessages,
+              unread: 0,
+            }
+          : item,
+      ),
+    );
+
+    // Same mark-as-read endpoint used in your old Inbox.
+    void whatsappInboxApi(
+      `/chat/${encodeURIComponent(phoneKey)}/read`,
+      { method: "POST" },
+    ).catch((error) => {
+      console.error("WhatsApp mark-as-read failed:", error);
+    });
+  } catch (error) {
+    console.error("WhatsApp chat loading failed:", error);
+    setWhatsappError(
+      error instanceof Error
+        ? error.message
+        : "Unable to load this WhatsApp conversation.",
+    );
+  }
+}, []);
+
+useEffect(() => {
+  const socket =
+    getSocket() ?? (admin?._id ? initSocket(admin._id) : null);
+
+  if (!socket) {
+    console.error("WhatsApp Inbox: Socket is not initialized.");
+    return;
+  }
+
+  const onStatus = (payload: any) => {
+    if (payload?.status === "connected") {
+      void loadBaileysCustomers();
+    }
+  };
+
+  const onMessage = (message: WhatsAppApiMessage) => {
+    const phoneKey = phoneKeyOf(message.phoneKey);
+    if (!phoneKey) return;
+
+    const mappedMessage = mapWhatsAppMessage(message);
+    const isActive = activePhoneKeyRef.current === phoneKey;
+
+    setConversations((current) =>
+      current.map((conversation) => {
+        if (
+          conversation.channel !== "baileys" ||
+          phoneKeyOf(conversation.contact) !== phoneKey
+        ) {
+          return conversation;
+        }
+
+        const existing = conversation.messages.some(
+          (item) => item.id === mappedMessage.id,
+        );
+
+        const nextMessages = isActive
+          ? existing
+            ? conversation.messages.map((item) =>
+                item.id === mappedMessage.id
+                  ? { ...item, ...mappedMessage }
+                  : item,
+              )
+            : [...conversation.messages, mappedMessage]
+          : [mappedMessage];
+
+        return {
+          ...conversation,
+          messages: nextMessages,
+          unread: isActive
+            ? 0
+            : conversation.unread + (message.fromMe ? 0 : 1),
+        };
+      }),
+    );
+
+    if (isActive && !message.fromMe) {
+      void whatsappInboxApi(
+        `/chat/${encodeURIComponent(phoneKey)}/read`,
+        { method: "POST" },
+      ).catch(() => {});
+    }
+  };
+
+  const onMessageStatus = (payload: {
+    waId: string;
+    status: string;
+  }) => {
+    setConversations((current) =>
+      current.map((conversation) => ({
+        ...conversation,
+        messages: conversation.messages.map((message) =>
+          message.id === payload.waId
+            ? {
+                ...message,
+                status: payload.status as InboxMessage["status"],
+              }
+            : message,
+        ),
+      })),
+    );
+  };
+
+  const onPollVotes = (payload: {
+    waId: string;
+    pollVotes: InboxMessage["pollVotes"];
+  }) => {
+    setConversations((current) =>
+      current.map((conversation) => ({
+        ...conversation,
+        messages: conversation.messages.map((message) =>
+          message.id === payload.waId
+            ? { ...message, pollVotes: payload.pollVotes }
+            : message,
+        ),
+      })),
+    );
+  };
+
+  const onReconnect = () => {
+    void loadBaileysCustomers();
+  };
+
+  socket.on("whatsapp:status", onStatus);
+  socket.on("whatsapp:message", onMessage);
+  socket.on("whatsapp:message_status", onMessageStatus);
+  socket.on("whatsapp:poll_votes", onPollVotes);
+  socket.on("connect", onReconnect);
+
+  // Keep the existing socket.ts. The Inbox owns this viewing session.
+  socket.emit("whatsapp:start_viewing");
+
+  return () => {
+    socket.off("whatsapp:status", onStatus);
+    socket.off("whatsapp:message", onMessage);
+    socket.off("whatsapp:message_status", onMessageStatus);
+    socket.off("whatsapp:poll_votes", onPollVotes);
+    socket.off("connect", onReconnect);
+
+    socket.emit("whatsapp:stop_viewing");
+  };
+}, [admin?._id, loadBaileysCustomers]);
+
+useEffect(() => {
+  void loadBaileysCustomers();
+}, [loadBaileysCustomers]);
+
+
+ function selectConversation(conversation: InboxConversation) {
+  setSelectedId(conversation.id);
+  setMobileChat(true);
+
+  updateConversation(conversation.id, { unread: 0 });
+
+  if (conversation.channel === "baileys") {
+    void loadBaileysChat(conversation);
+  } else {
+    activePhoneKeyRef.current = null;
+  }
+}
+
+function changeChannel(next: InboxChannel) {
+  setChannel(next);
+  setSearch("");
+  setUnreadOnly(false);
+
+  // Find the first conversation for the selected channel.
+  const firstConversation = conversations.find(
+    (conversation) => conversation.channel === next,
+  );
+
+  setSelectedId(firstConversation?.id ?? null);
+
+  // Reset the previous WhatsApp chat when switching channels.
+  if (next !== "baileys") {
+    activePhoneKeyRef.current = null;
+  } else if (firstConversation) {
+    // Load the actual WhatsApp chat history.
+    void loadBaileysChat(firstConversation);
+  }
+
+  setMobileChat(false);
+  setShowContact(false);
+}
 
   function openModal(kind: ModalKind) {
     setFormError("");
     setModal(kind);
   }
 
-  async function sendMessage(
+async function sendMessage(
   text: string,
   files: File[],
   email?: { to: string; subject: string },
@@ -116,33 +551,74 @@ export default function InboxWorkspace({
   }
 
   const destination = selected;
+
+  // Real Baileys WhatsApp sending.
+  if (destination.channel === "baileys") {
+    if (files.length > 1) {
+      throw new Error(
+        "The existing WhatsApp API accepts one attachment per message. Please remove the extra files.",
+      );
+    }
+
+    const file = files[0];
+
+    const mediaType = !file
+      ? "text"
+      : file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("video/")
+          ? "video"
+          : "document";
+
+    const formData = new FormData();
+
+    formData.append("message", text);
+    formData.append("mediaType", mediaType);
+
+    // destination.id is the actual CRM customer _id.
+    formData.append(
+      "customerIds",
+      JSON.stringify([destination.id]),
+    );
+
+    if (file) {
+      formData.append("whatsappFile", file);
+    }
+
+    const response = await sendDirectMessageApi(formData);
+
+    if (!response?.success) {
+      throw new Error(
+        response?.message || "WhatsApp message could not be sent.",
+      );
+    }
+
+    // Do not add a fake/local message here.
+    // The actual saved message is added by whatsapp:message.
+    return;
+  }
+
+  // Keep your existing integration callback for other channels.
+  if (!onSendMessage) {
+    throw new Error(
+      "Sending is not configured for this channel.",
+    );
+  }
+
   const emailSubject =
     destination.channel === "email" ? email?.subject : undefined;
 
-  const message: InboxMessage = onSendMessage
-    ? await onSendMessage({
-        conversationId: destination.id,
-        channel: destination.channel,
-        recipient:
-          destination.channel === "email"
-            ? email?.to || destination.contact
-            : destination.contact,
-        subject: emailSubject,
-        text,
-        files,
-      })
-    : {
-        id: crypto.randomUUID(),
-        direction: "outgoing",
-        subject: emailSubject,
-        text,
-        createdAt: new Date().toISOString(),
-        status: "local",
-        attachments: files.map((file) => ({
-          name: file.name,
-          size: file.size,
-        })),
-      };
+  const message: InboxMessage = await onSendMessage({
+    conversationId: destination.id,
+    channel: destination.channel,
+    recipient:
+      destination.channel === "email"
+        ? email?.to || destination.contact
+        : destination.contact,
+    subject: emailSubject,
+    text,
+    files,
+  });
 
   setConversations((current) =>
     current.map((item) =>
@@ -161,6 +637,35 @@ export default function InboxWorkspace({
     ),
   );
 }
+async function sendWhatsAppSpecial(payload: WhatsAppSpecialPayload) {
+  if (!selected || selected.channel !== "baileys" || selected.blocked) {
+    throw new Error("This WhatsApp conversation is unavailable.");
+  }
+
+  const destination = selected;
+  const formData = new FormData();
+
+  // Match the existing CRM WhatsApp endpoint's field names exactly.
+  formData.append("message", "");
+  formData.append("mediaType", payload.mediaType);
+  formData.append("customerIds", JSON.stringify([destination.id]));
+
+  if (payload.mediaType === "poll") {
+    formData.append("poll", JSON.stringify(payload.poll));
+  } else {
+    formData.append("location", JSON.stringify(payload.location));
+  }
+
+  const response = await sendDirectMessageApi(formData);
+
+  if (!response?.success) {
+    throw new Error(
+      response?.message || `WhatsApp ${payload.mediaType} could not be sent.`,
+    );
+  }
+
+  // The saved message is supplied by the existing inbox API/socket flow.
+}
 
   function saveModal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -176,6 +681,25 @@ export default function InboxWorkspace({
         setFormError("Enter a name and contact.");
         return;
       }
+if (nextChannel === "baileys") {
+  const existingBaileys = conversations.find(
+    (item) =>
+      item.channel === "baileys" &&
+      phoneKeyOf(item.contact) === phoneKeyOf(contact),
+  );
+
+  if (existingBaileys) {
+    changeChannel("baileys");
+    selectConversation(existingBaileys);
+    setModal(null);
+    return;
+  }
+
+  setFormError(
+    "Add this person to your CRM Customers first. Baileys Inbox uses your existing CRM customers.",
+  );
+  return;
+}
 
       const existing = conversations.find(
         (item) => item.channel === nextChannel && item.contact === contact,
@@ -434,8 +958,8 @@ export default function InboxWorkspace({
   );
 
   return (
-    <section className="@container h-[calc(100dvh-var(--header-height))] min-h-0 w-full min-w-0 bg-[var(--page)] text-[var(--text)]">
-      <div className="flex h-full min-h-0 flex-col gap-4 p-3 @[900px]:p-5">
+    <section className="@container flex h-[calc(100dvh-var(--header-height))] w-full flex-col bg-[var(--page)] text-[var(--text)]">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-3 @[900px]:p-5">
         {/* Page heading */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div>
@@ -537,9 +1061,21 @@ export default function InboxWorkspace({
             );
           })}
         </div>
+                  {/* WhatsApp loading and error messages */}
+        {channel === "baileys" && whatsappLoading && (
+          <p className="text-xs text-[var(--muted)]">
+            Loading your CRM customers and WhatsApp conversations...
+          </p>
+        )}
+
+        {channel === "baileys" && whatsappError && (
+          <p className="text-xs text-[var(--danger)]">
+            {whatsappError}
+          </p>
+        )}
 
         {/* Main inbox grid */}
-        <div className="relative grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] @[720px]:grid-cols-[280px_minmax(0,1fr)] @[1180px]:grid-cols-[300px_minmax(0,1fr)_290px]">
+        <div className="relative grid min-h-[500px] flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] @[720px]:min-h-[600px] @[720px]:grid-cols-[280px_minmax(0,1fr)] @[1180px]:grid-cols-[300px_minmax(0,1fr)_290px]">
           <ConversationList
             channelConversations={channelConversations}
             visibleConversations={visibleConversations}
@@ -568,8 +1104,10 @@ export default function InboxWorkspace({
               >
                 <InboxChat
                   conversation={conversation}
-                  localMode={!onSendMessage}
+                  localMode={false}
                   onSend={sendMessage}
+                  onSendWhatsAppSpecial={sendWhatsAppSpecial}
+                  onWhatsAppRefresh={() => loadBaileysChat(conversation)}
                   onToggleStar={() =>
                     updateConversation(conversation.id, {
                       starred: !conversation.starred,

@@ -104,7 +104,7 @@ export default function BaileysConnection({
 
     const socket = getSocket();
     if (socket) {
-      socket.emit("whatsapp:start_viewing");
+     
 
       const handleQR = (data: { qrString: string; generatedAt?: number; refreshInterval?: number }) => {
         setQrCode(data.qrString);
@@ -160,7 +160,7 @@ export default function BaileysConnection({
         socket.off("whatsapp:status", handleStatus);
         socket.off("whatsapp:pairing_code", handlePairingCode);
         socket.off("whatsapp:pairing_error", handlePairingError);
-        socket.emit("whatsapp:stop_viewing");
+      
       };
     }
 
