@@ -1,4 +1,4 @@
-import { API_ROUTES } from "@/constants/ApiRoute";
+import { API_ROUTES } from "@/constants/ApiRoutes";
 import { mailAllContactInterface, mailAllCustomerInterface, mailAllDataInterface } from "./mail.interface";
 
 export const getMail = async () => {
