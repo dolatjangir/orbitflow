@@ -184,7 +184,7 @@ function ProviderIcon({ provider }: { provider: Provider }) {
           <path d="M3 7v7l6 5v-7Z" fill="#c5221f" />
           <path d="M29 7v7l-6 5v-7Z" fill="#fbbc04" />
         </svg>
-      </span>
+      </span>   
     );
   if (provider === "outlook")
     return (
