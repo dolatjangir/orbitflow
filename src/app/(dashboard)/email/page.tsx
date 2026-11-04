@@ -1,26 +1,66 @@
 "use client";
-import { useState } from "react";
-import { DashboardApp } from "@/components/dashboard/dashboard-app";
-import EmailWorkspaceSetup from "@/components/dashboard/pages/email-workspace";
-import { EmailPageContent } from "@/components/dashboard/pages/email-page-content";
-import EmailConnected from "@/components/dashboard/pages/email-workspace-after";
 
+import { useCallback, useEffect, useState } from "react";
+import { DashboardApp } from "@/components/dashboard/dashboard-app";
+import EmailWorkspaceSetup, { Banner, type ConnectResult } from "@/components/dashboard/pages/email-workspace";
+import EmailConnected from "@/components/dashboard/pages/email-workspace-after";
+import { getEmailConnection, type EmailConnection } from "@/store/mail/mail";
 
 export default function EmailPage() {
-  const connectChannel = (name: string) => {
-    alert(
-      `${name} connection flow is not configured yet. Please configure your provider credentials.`
-    );
+  const [connection, setConnection] = useState<EmailConnection | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ text: string; warnings: string[] }>();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const r = await getEmailConnection();
+    if (r.ok) setConnection(r.data.connection);
+    else setLoadError(r.error.message);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onConnected = ({ connection, message, warnings }: ConnectResult) => {
+    setFlash({ text: message, warnings });
+    setConnection(connection);
   };
 
-     const [activeView, setActiveView] = useState<"before" | "after">("before"); 
-  return( 
-  
-  <DashboardApp initialSection="email" >
-    <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => setActiveView("before")}>Before</button><button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" onClick={() => setActiveView("after")}>After</button>
-            {activeView === "before" ? <EmailWorkspaceSetup /> :    <EmailConnected/>
-        }
-  
+  const onDisconnected = (text: string) => {
+    setFlash({ text, warnings: [] });
+    setConnection({ connected: false });
+  };
+
+  return (
+    <DashboardApp initialSection="email">
+      {loading ? (
+        <p role="status" className="text-sm text-[var(--text-soft)]">Checking your email connection…</p>
+      ) : loadError ? (
+        <div className="space-y-3">
+          <Banner tone="error" title="Couldn't load your email connection">{loadError}</Banner>
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs font-semibold hover:border-blue-500"
+          >
+            Try again
+          </button>
+        </div>
+      ) : connection?.connected ? (
+        <EmailConnected
+          connection={connection}
+          notice={flash?.text}
+          warnings={flash?.warnings}
+          onChange={setConnection}
+          onDisconnected={onDisconnected}
+        />
+      ) : (
+        <EmailWorkspaceSetup onConnected={onConnected} notice={flash?.text} />
+      )}
     </DashboardApp>
-  )
+  );
 }

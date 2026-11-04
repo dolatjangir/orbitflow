@@ -566,7 +566,11 @@ export const API_ROUTES = {
       DELETE: (id: string) => `${BASE_URL}/v1/templates/${id}`,
       MAILALL: `${BASE_URL}/v1/messages/email`,
       FILEUPLOAD: `${BASE_URL}/v1/messages/uploads/file`,
-      SEND_EMAIL_VIA_AI: `${BASE_URL}/v1/messages/send-email-via-ai`
+      SEND_EMAIL_VIA_AI: `${BASE_URL}/v1/messages/send-email-via-ai`,
+
+      EMAIL_CONNECTION: `${BASE_URL}/v1/messages/email-connection`,               // GET (status) · POST (connect) · DELETE (disconnect)
+      EMAIL_CONNECTION_TEST: `${BASE_URL}/v1/messages/email-connection/test`,     // POST (detect + verify, saves nothing)
+      EMAIL_CONNECTION_VERIFY: `${BASE_URL}/v1/messages/email-connection/verify`, // POS
     },
     WHATSAPP: {
       GET_ALL: `${BASE_URL}/v1/templates?type=whatsapp`,
